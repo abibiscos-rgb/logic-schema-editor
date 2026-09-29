@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logic Schema Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 40px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            color: #667eea;
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            padding: 20px 40px;
+            overflow: hidden;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .input-panel {
+            flex: 0 0 350px;
+        }
+
+        .canvas-panel {
+            flex: 1;
+            position: relative;
+        }
+
+        .panel-title {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .panel-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        textarea {
+            flex: 1;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            resize: none;
+            line-height: 1.6;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+
+        .canvas {
+            flex: 1;
+            position: relative;
+            background: #f9f9f9;
+            overflow: auto;
+            border-radius: 8px;
+            cursor: grab;
+        }
+
+        .canvas.grabbing {
+            cursor: grabbing;
+        }
+
+        svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        .node {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+            transition: box-shadow 0.2s;
+        }
+
+        .node.selected {
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.5);
+        }
+
+        .node-box {
+            padding: 12px 16px;
+            border-radius: 6px;
+            background: white;
+            border: 2px solid #667eea;
+            text-align: center;
+            font-weight: 600;
+            font-size: 13px;
+            min-width: 100px;
+            cursor: pointer;
+            word-wrap: break-word;
+            max-width: 120px;
+        }
+
+        .node-box.start,
+        .node-box.stop {
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            background: #667eea;
+            color: white;
+            border: none;
+        }
+
+        .node-box.process {
+            border-radius: 6px;
+            background: #e3f2fd;
+            border: 2px solid #2196F3;
+            color: #1565c0;
+        }
+
+        .node-box.decision {
+            transform: rotate(45deg);
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff3e0;
+            border: 2px solid #ff9800;
+            color: #e65100;
+            padding: 0;
+        }
+
+        .node-box.decision span {
+            transform: rotate(-45deg);
+            display: block;
+        }
+
+        .node-box.io {
+            border-radius: 8px 0;
+            background: #f3e5f5;
+            border: 2px solid #9c27b0;
+            color: #6a1b9a;
+        }
+
+        .node-box.output {
+            background: #e8f5e9;
+            border: 2px solid #4caf50;
+            color: #2e7d32;
+        }
+
+        .node-toolbar {
+            position: absolute;
+            bottom: -45px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 5px;
+            background: white;
+            padding: 8px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .node.selected .node-toolbar {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .toolbar-btn {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .properties-panel {
+            flex: 0 0 250px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .properties-content {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .prop-group {
+            margin-bottom: 20px;
+        }
+
+        .prop-label {
+            font-weight: 600;
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .prop-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 13px;
+            transition: border-color 0.3s;
+        }
+
+        .prop-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .color-picker {
+            width: 100%;
+            height: 40px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .shape-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .shape-btn {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .shape-btn:hover {
+            border-color: #667eea;
+            background: #f0f0ff;
+        }
+
+        .shape-btn.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #999;
+            text-align: center;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            z-index: 100;
+        }
+
+        .zoom-controls button {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            font-size: 18px;
+        }
+
+        .zoom-level {
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: center;
+            color: #333;
+        }
+
+        @media (max-width: 1400px) {
+            .properties-panel {
+                flex: 0 0 200px;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                flex-direction: column;
+                padding: 15px;
+            }
+
+            .input-panel,
+            .properties-panel {
+                flex: 0 0 auto;
+                max-height: 300px;
+            }
+
+            .canvas-panel {
+                flex: 1;
+                min-height: 400px;
+            }
+        }
+
+        .status-bar {
+            background: white;
+            padding: 10px 40px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Logic Schema Editor</h1>
+        <div class="header-buttons">
+            <button class="btn-secondary btn-small" onclick="app.clearAll()">🗑️ Clear</button>
+            <button class="btn-secondary btn-small" onclick="app.saveSchema()">💾 Save</button>
+            <button class="btn-secondary btn-small" onclick="app.loadSchema()">📂 Load</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Input Panel -->
+        <div class="panel input-panel">
+            <div class="panel-title">📝 Introdu Textul Schemei</div>
+            <div class="panel-content">
+                <textarea id="textInput" placeholder="[START]
+| Citire n |
+[ i <- 1 ]
+< i <= n >
+DA:
+< n % i == 0 >
+DA: / Afișează i /
+[ i <- i + 1 ] -> întoarcere la i <= n
+NU: [STOP]"></textarea>
+                <button class="btn-primary" onclick="app.generateSchema()">🚀 Generează Schema</button>
+            </div>
+        </div>
+
+        <!-- Canvas Panel -->
+        <div class="panel canvas-panel">
+            <div class="panel-title">🎨 Diagramă Logică</div>
+            <div class="canvas" id="canvas">
+                <svg id="svg" width="100%" height="100%"></svg>
+                <div class="empty-state" id="emptyState">
+                    <p>Introdu textul și apasă "Generează Schema"</p>
+                </div>
+                <div class="zoom-controls">
+                    <button class="btn-secondary" onclick="app.zoomOut()">−</button>
+                    <div class="zoom-level" id="zoomLevel">100%</div>
+                    <button class="btn-secondary" onclick="app.zoomIn()">+</button>
+                    <button class="btn-secondary" onclick="app.resetZoom()">↺</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Properties Panel -->
+        <div class="properties-panel">
+            <div class="panel-title">⚙️ Proprietăți</div>
+            <div class="properties-content" id="propertiesContent">
+                <div class="empty-state">
+                    <p>Selectează un element</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span id="statusText">Gata</span>
+    </div>
+
+    <!-- Save/Load Modal -->
+    <div class="modal" id="saveModal">
+        <div class="modal-content">
+            <div class="modal-title">Salvează Schema</div>
+            <input type="text" class="modal-input" id="saveName" placeholder="Nume schema...">
+            <div class="modal-buttons">
+                <button class="btn-primary" onclick="app.confirmSave()">Salvează</button>
+                <button class="btn-secondary" onclick="app.closeSaveModal()">Anulează</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class LogicSchemaEditor {
+            constructor() {
+                this.nodes = [];
+                this.connections = [];
+                this.selectedNode = null;
+                this.draggedNode = null;
+                this.zoom = 1;
+                this.panX = 0;
+                this.panY = 0;
+                this.canvasDrag = false;
+                this.dragStartX = 0;
+                this.dragStartY = 0;
+
+                this.init();
+            }
+
+            init() {
+                const canvas = document.getElementById('canvas');
+                canvas.addEventListener('mousedown', (e) => this.onCanvasMouseDown(e));
+                document.addEventListener('mousemove', (e) => this.onMouseMove(e));
+                document.addEventListener('mouseup', (e) => this.onMouseUp(e));
+            }
+
+            generateSchema() {
+                const text = document.getElementById('textInput').value;
+                if (!text.trim()) {
+                    this.setStatus('Introduceți text');
+                    return;
+                }
+
+                this.nodes = [];
+                this.connections = [];
+                this.selectedNode = null;
+
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+                let nodeStack = [];
+                let startX = 100;
+                let currentY = 100;
+                let nodeMap = {};
+
+                lines.forEach((line, index) => {
+                    if (line === '[START]') {
+                        const node = this.createNode('START', startX, currentY, 'start', 'START');
+                        nodeMap['START'] = node;
+                        currentY += 120;
+                    } else if (line === '[STOP]' || line === 'NU: [STOP]') {
+                        const node = this.createNode('STOP', startX, currentY, 'stop', 'STOP');
+                        nodeMap['STOP'] = node;
+                    } else if (line.startsWith('[') && line.endsWith(']')) {
+                        const text = line.slice(1, -1).trim();
+                        const node = this.createNode(`node-${this.nodes.length}`, startX, currentY, 'process', text);
+                        nodeStack.push(node);
+                        currentY += 100;
+                    } else if (line.startsWith('|') && line.endsWith('|')) {
+                        const text = line.slice(1, -1).trim();
+                        const node = this.createNode(`node-${this.nodes.length}`, startX, currentY, 'io', text);
+                        nodeStack.push(node);
+                        currentY += 100;
+                    } else if (line.startsWith('<') && line.endsWith('>')) {
+                        const text = line.slice(1, -1).trim();
+                        const node = this.createNode(`node-${this.nodes.length}`, startX + 150, currentY, 'decision', text);
+                        nodeStack.push(node);
+                        currentY += 150;
+                    } else if (line.startsWith('/') && line.endsWith('/')) {
+                        const text = line.slice(1, -1).trim();
+                        const node = this.createNode(`node-${this.nodes.length}`, startX + 150, currentY, 'output', text);
+                        nodeStack.push(node);
+                        currentY += 100;
+                    } else if (line.startsWith('DA:') || line.startsWith('NU:')) {
+                        // Handle branches
+                        const branchDir = line.startsWith('DA:') ? 'DA' : 'NU';
+                        // Continue processing
+                    }
+                });
+
+                // Connect nodes sequentially if no explicit connections
+                if (this.nodes.length > 1) {
+                    for (let i = 0; i < this.nodes.length - 1; i++) {
+                        this.connections.push({
+                            from: this.nodes[i].id,
+                            to: this.nodes[i + 1].id,
+                            label: ''
+                        });
+                    }
+                }
+
+                this.render();
+                this.setStatus(`Schema generată cu ${this.nodes.length} noduri`);
+                document.getElementById('emptyState').style.display = 'none';
+            }
+
+            createNode(id, x, y, type, text) {
+                const node = {
+                    id,
+                    x,
+                    y,
+                    type,
+                    text,
+                    width: 120,
+                    height: type === 'decision' ? 100 : 60,
+                    color: this.getDefaultColor(type)
+                };
+                this.nodes.push(node);
+                return node;
+            }
+
+            getDefaultColor(type) {
+                const colors = {
+                    start: '#667eea',
+                    stop: '#f44336',
+                    process: '#2196F3',
+                    decision: '#ff9800',
+                    io: '#9c27b0',
+                    output: '#4caf50'
+                };
+                return colors[type] || '#667eea';
+            }
+
+            render() {
+                const canvas = document.getElementById('canvas');
+                const svg = document.getElementById('svg');
+                
+                // Clear previous nodes
+                document.querySelectorAll('.node').forEach(n => n.remove());
+
+                // Draw connections
+                this.drawConnections();
+
+                // Draw nodes
+                this.nodes.forEach(node => {
+                    this.drawNode(node);
+                });
+            }
+
+            drawConnections() {
+                const svg = document.getElementById('svg');
+                svg.innerHTML = '';
+
+                this.connections.forEach(conn => {
+                    const fromNode = this.nodes.find(n => n.id === conn.from);
+                    const toNode = this.nodes.find(n => n.id === conn.to);
+
+                    if (fromNode && toNode) {
+                        const x1 = fromNode.x + fromNode.width / 2;
+                        const y1 = fromNode.y + fromNode.height;
+                        const x2 = toNode.x + toNode.width / 2;
+                        const y2 = toNode.y;
+
+                        // Draw line
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', x1);
+                        line.setAttribute('y1', y1);
+                        line.setAttribute('x2', x2);
+                        line.setAttribute('y2', y2);
+                        line.setAttribute('stroke', '#999');
+                        line.setAttribute('stroke-width', '2');
+                        svg.appendChild(line);
+
+                        // Draw arrow
+                        const arrowSize = 10;
+                        const angle = Math.atan2(y2 - y1, x2 - x1);
+                        const arrowPath = `M ${x2} ${y2} L ${x2 - arrowSize * Math.cos(angle - Math.PI / 6)} ${y2 - arrowSize * Math.sin(angle - Math.PI / 6)} L ${x2 - arrowSize * Math.cos(angle + Math.PI / 6)} ${y2 - arrowSize * Math.sin(angle + Math.PI / 6)}`;
+                        const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        arrow.setAttribute('d', arrowPath);
+                        arrow.setAttribute('fill', '#999');
+                        svg.appendChild(arrow);
+
+                        // Draw label
+                        if (conn.label) {
+                            const midX = (x1 + x2) / 2;
+                            const midY = (y1 + y2) / 2;
+                            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                            text.setAttribute('x', midX);
+                            text.setAttribute('y', midY - 10);
+                            text.setAttribute('text-anchor', 'middle');
+                            text.setAttribute('font-size', '12');
+                            text.setAttribute('font-weight', '600');
+                            text.setAttribute('fill', '#667eea');
+                            text.textContent = conn.label;
+                            svg.appendChild(text);
+                        }
+                    }
+                });
+            }
+
+            drawNode(node) {
+                const canvas = document.getElementById('canvas');
+                const nodeEl = document.createElement('div');
+                nodeEl.className = 'node';
+                nodeEl.dataset.nodeId = node.id;
+                nodeEl.style.left = node.x + 'px';
+                nodeEl.style.top = node.y + 'px';
+
+                if (this.selectedNode?.id === node.id) {
+                    nodeEl.classList.add('selected');
+                }
+
+                const box = document.createElement('div');
+                box.className = `node-box ${node.type}`;
+                box.style.borderColor = node.color;
+                box.style.backgroundColor = node.type === 'start' || node.type === 'stop' ? node.color : 'white';
+                box.style.color = node.type === 'start' || node.type === 'stop' ? 'white' : 'inherit';
+
+                if (node.type === 'decision') {
+                    const span = document.createElement('span');
+                    span.textContent = node.text;
+                    box.appendChild(span);
+                } else {
+                    box.textContent = node.text;
+                }
+
+                box.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.selectNode(node);
+                });
+
+                box.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    this.draggedNode = node;
+                    this.dragStartX = e.clientX;
+                    this.dragStartY = e.clientY;
+                });
+
+                nodeEl.appendChild(box);
+
+                // Toolbar
+                const toolbar = document.createElement('div');
+                toolbar.className = 'node-toolbar';
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'toolbar-btn btn-secondary';
+                deleteBtn.textContent = '🗑️';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.deleteNode(node.id);
+                };
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'toolbar-btn btn-secondary';
+                editBtn.textContent = '✏️';
+                editBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.editNodeText(node);
+                };
+
+                const duplicateBtn = document.createElement('button');
+                duplicateBtn.className = 'toolbar-btn btn-secondary';
+                duplicateBtn.textContent = '📋';
+                duplicateBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.duplicateNode(node);
+                };
+
+                toolbar.appendChild(editBtn);
+                toolbar.appendChild(deleteBtn);
+                toolbar.appendChild(duplicateBtn);
+                nodeEl.appendChild(toolbar);
+
+                canvas.appendChild(nodeEl);
+            }
+
+            selectNode(node) {
+                this.selectedNode = node;
+                this.render();
+                this.updateProperties(node);
+            }
+
+            updateProperties(node) {
+                const panel = document.getElementById('propertiesContent');
+                panel.innerHTML = `
+                    <div class="prop-group">
+                        <label class="prop-label">Text</label>
+                        <input type="text" class="prop-input" value="${node.text}" onchange="app.selectedNode.text = this.value; app.render();">
+                    </div>
+                    <div class="prop-group">
+                        <label class="prop-label">Tip</label>
+                        <div class="shape-options">
+                            <button class="shape-btn ${node.type === 'process' ? 'active' : ''}" onclick="app.changeNodeType('process')">Procesu</button>
+                            <button class="shape-btn ${node.type === 'decision' ? 'active' : ''}" onclick="app.changeNodeType('decision')">Decizie</button>
+                            <button class="shape-btn ${node.type === 'io' ? 'active' : ''}" onclick="app.changeNodeType('io')">I/O</button>
+                            <button class="shape-btn ${node.type === 'output' ? 'active' : ''}" onclick="app.changeNodeType('output')">Output</button>
+                        </div>
+                    </div>
+                    <div class="prop-group">
+                        <label class="prop-label">Culoare</label>
+                        <input type="color" class="color-picker" value="${node.color}" onchange="app.selectedNode.color = this.value; app.render();">
+                    </div>
+                    <div class="prop-group">
+                        <label class="prop-label">Dimensiune</label>
+                        <div style="display: flex; gap: 10px;">
+                            <div>
+                                <label class="prop-label" style="font-size: 11px;">Lățime</label>
+                                <input type="number" class="prop-input" value="${node.width}" onchange="app.selectedNode.width = parseInt(this.value); app.render();">
+                            </div>
+                            <div>
+                                <label class="prop-label" style="font-size: 11px;">Înălțime</label>
+                                <input type="number" class="prop-input" value="${node.height}" onchange="app.selectedNode.height = parseInt(this.value); app.render();">
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            changeNodeType(type) {
+                if (this.selectedNode) {
+                    this.selectedNode.type = type;
+                    this.selectedNode.color = this.getDefaultColor(type);
+                    this.render();
+                    this.updateProperties(this.selectedNode);
+                }
+            }
+
+            editNodeText(node) {
+                const newText = prompt('Editează textul nodului:', node.text);
+                if (newText !== null) {
+                    node.text = newText;
+                    this.render();
+                }
+            }
+
+            deleteNode(nodeId) {
+                this.nodes = this.nodes.filter(n => n.id !== nodeId);
+                this.connections = this.connections.filter(c => c.from !== nodeId && c.to !== nodeId);
+                this.selectedNode = null;
+                this.render();
+                this.setStatus('Nod șters');
+            }
+
+            duplicateNode(node) {
+                const newNode = {
+                    ...node,
+                    id: `node-${Date.now()}`,
+                    x: node.x + 150,
+                    y: node.y + 50
+                };
+                this.nodes.push(newNode);
+                this.render();
+            }
+
+            onCanvasMouseDown(e) {
+                if (e.target.id === 'canvas' || e.target.id === 'svg' || e.target.id === 'emptyState') {
+                    this.canvasDrag = true;
+                    this.dragStartX = e.clientX;
+                    this.dragStartY = e.clientY;
+                    document.getElementById('canvas').classList.add('grabbing');
+                }
+            }
+
+            onMouseMove(e) {
+                if (this.draggedNode) {
+                    const deltaX = e.clientX - this.dragStartX;
+                    const deltaY = e.clientY - this.dragStartY;
+                    this.draggedNode.x += deltaX;
+                    this.draggedNode.y += deltaY;
+                    this.dragStartX = e.clientX;
+                    this.dragStartY = e.clientY;
+                    this.render();
+                }
+
+                if (this.canvasDrag && this.selectedNode === null) {
+                    const deltaX = e.clientX - this.dragStartX;
+                    const deltaY = e.clientY - this.dragStartY;
+                    this.panX += deltaX;
+                    this.panY += deltaY;
+                    this.dragStartX = e.clientX;
+                    this.dragStartY = e.clientY;
+                    document.getElementById('canvas').scrollLeft -= deltaX;
+                    document.getElementById('canvas').scrollTop -= deltaY;
+                }
+            }
+
+            onMouseUp(e) {
+                this.draggedNode = null;
+                this.canvasDrag = false;
+                document.getElementById('canvas').classList.remove('grabbing');
+            }
+
+            zoomIn() {
+                this.zoom = Math.min(2, this.zoom + 0.1);
+                this.applyZoom();
+            }
+
+            zoomOut() {
+                this.zoom = Math.max(0.5, this.zoom - 0.1);
+                this.applyZoom();
+            }
+
+            resetZoom() {
+                this.zoom = 1;
+                this.panX = 0;
+                this.panY = 0;
+                this.applyZoom();
+            }
+
+            applyZoom() {
+                const canvas = document.getElementById('canvas');
+                canvas.style.transform = `scale(${this.zoom})`;
+                canvas.style.transformOrigin = 'top left';
+                document.getElementById('zoomLevel').textContent = Math.round(this.zoom * 100) + '%';
+            }
+
+            saveSchema() {
+                document.getElementById('saveModal').classList.add('active');
+            }
+
+            confirmSave() {
+                const name = document.getElementById('saveName').value || 'schema_' + Date.now();
+                const data = {
+                    nodes: this.nodes,
+                    connections: this.connections
+                };
+                localStorage.setItem(`schema_${name}`, JSON.stringify(data));
+                this.setStatus(`Schema salvată: ${name}`);
+                this.closeSaveModal();
+            }
+
+            closeSaveModal() {
+                document.getElementById('saveModal').classList.remove('active');
+            }
+
+            loadSchema() {
+                const schemas = Object.keys(localStorage).filter(k => k.startsWith('schema_'));
+                if (schemas.length === 0) {
+                    alert('Nu sunt scheme salvate');
+                    return;
+                }
+
+                const name = prompt('Alege schema:\n' + schemas.map(s => s.replace('schema_', '')).join('\n'));
+                if (name) {
+                    const data = JSON.parse(localStorage.getItem(`schema_${name}`));
+                    this.nodes = data.nodes;
+                    this.connections = data.connections;
+                    this.render();
+                    this.setStatus(`Schema încărcată: ${name}`);
+                }
+            }
+
+            clearAll() {
+                if (confirm('Ștergeți toată schema?')) {
+                    this.nodes = [];
+                    this.connections = [];
+                    this.selectedNode = null;
+                    this.render();
+                    document.getElementById('emptyState').style.display = 'flex';
+                    this.setStatus('Schema ștearsă');
+                }
+            }
+
+            setStatus(message) {
+                document.getElementById('statusText').textContent = message;
+            }
+        }
+
+        const app = new LogicSchemaEditor();
+    </script>
+</body>
+</html>
